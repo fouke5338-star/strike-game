@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Strike: Grammar Cyber-Runner</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
+body{background:#0f172a;color:white;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:10px}
+.game-card{background:#1e293b;width:100%;max-width:480px;border-radius:16px;padding:20px;box-shadow:0 10px 25px rgba(0,0,0,.5);border:2px solid #38bdf8;position:relative;overflow:hidden}
+.status-bar{display:flex;justify-content:space-between;font-weight:bold;font-size:1.1rem;margin-bottom:15px;background:#0f172a;padding:10px 15px;border-radius:8px}
+.hp{color:#ef4444}.timer{color:#f59e0b}
+.stage{height:160px;background:#334155;border-radius:12px;display:flex;justify-content:space-around;align-items:center;position:relative;margin-bottom:15px;overflow:hidden;border:1px solid #475569}
+.character{font-size:3.5rem;transition:transform .3s ease}.player{transform:scaleX(1)}.enemy{transform:scaleX(-1)}
+.attack-anim{animation:playerAttack .6s ease infinite alternate}
+.hurt-anim{animation:playerHurt .4s ease infinite}
+@keyframes playerAttack{0%{transform:translateX(0) scale(1)}100%{transform:translateX(60px) scale(1.2)}}
+@keyframes playerHurt{0%{transform:translateX(0);filter:brightness(1)}50%{transform:translateX(-15px);filter:brightness(3) drop-shadow(0 0 10px red)}100%{transform:translateX(0)}}
+.action-banner{position:absolute;top:10px;width:100%;text-align:center;font-weight:bold;font-size:1rem;color:#38bdf8;text-shadow:0 0 5px rgba(0,0,0,.8)}
+.question-box{background:#0f172a;padding:15px;border-radius:10px;border-left:4px solid #38bdf8;margin-bottom:15px}
+.question-title{font-size:.85rem;color:#94a3b8;margin-bottom:5px;text-transform:uppercase}
+.question-text{font-size:1.1rem;font-weight:600;color:#f8fafc}
+.options-container{display:flex;flex-direction:column;gap:10px}
+.btn-opt{background:#334155;color:#f8fafc;border:2px solid #475569;padding:12px 15px;border-radius:8px;font-size:.95rem;text-align:left;cursor:pointer;transition:.2s}
+.btn-opt:hover:not(:disabled){background:#475569;border-color:#38bdf8}
+.btn-opt:disabled{opacity:.6;cursor:not-allowed}
+.cooldown-text{text-align:center;font-size:.9rem;color:#a7f3d0;margin-top:10px;min-height:20px;font-weight:bold}
+.overlay{position:absolute;inset:0;width:100%;height:100%;background:rgba(15,23,42,.95);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:10}
+.overlay h1{font-size:2rem;margin-bottom:10px;color:#38bdf8}
+.overlay p{font-size:1rem;margin-bottom:15px;color:#cbd5e1;text-align:center;padding:0 20px}
+.overlay button{background:#38bdf8;color:#0f172a;border:none;padding:12px 24px;font-size:1rem;font-weight:bold;border-radius:8px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="game-card">
+  <div class="status-bar">
+    <div class="hp">HP: <span id="hp-val">❤️ 5</span></div>
+    <div class="timer">⏳ <span id="timer-val">05:00</span></div>
+  </div>
+  <div class="stage">
+    <div class="action-banner" id="action-banner">พร้อมสู้! เลือกคำตอบที่ถูกต้อง</div>
+    <div class="character player" id="player-char">🤖</div>
+    <div class="character enemy" id="enemy-char">👾</div>
+  </div>
+  <div class="question-box">
+    <div class="question-title" id="q-task">Change to Passive Voice</div>
+    <div class="question-text" id="q-text">กดเริ่มเกมเพื่อเริ่มเล่น</div>
+  </div>
+  <div class="options-container" id="options-box"></div>
+  <div class="cooldown-text" id="cooldown-msg"></div>
+  <div class="overlay" id="overlay-screen">
+    <h1 id="overlay-title">Voice Strike</h1>
+    <p id="overlay-desc">ตอบคำถาม Active / Passive Voice เพื่อต่อสู้!</p>
+    <button id="start-btn" onclick="startGame()">เริ่มเล่นเกม</button>
+  </div>
+</div>
+<script>
+const questions = [
+{q:"The cat chased the mouse.",task:"Change to Passive Voice",options:["The mouse was chased by the cat.","The mouse is chased by the cat.","The cat was chased by the mouse."],correct:0},
+{q:"John writes a letter.",task:"Change to Passive Voice",options:["A letter was written by John.","A letter is written by John.","A letter has written by John."],correct:1},
+{q:"The chef prepares the dinner.",task:"Change to Passive Voice",options:["The dinner is prepared by the chef.","The dinner was prepared by the chef.","The chef is prepared by dinner."],correct:0},
+{q:"They built a new house.",task:"Change to Passive Voice",options:["A new house is built by them.","A new house was built by them.","A new house were built by them."],correct:1},
+{q:"The teacher opens the door.",task:"Change to Passive Voice",options:["The door was opened by the teacher.","The door is opened by the teacher.","The door opened by teacher."],correct:1},
+{q:"The window was broken by Tom.",task:"Change to Active Voice",options:["Tom broke the window.","Tom breaks the window.","Tom has broken the window."],correct:0},
+{q:"A song is sung by Sarah.",task:"Change to Active Voice",options:["Sarah sang a song.","Sarah sings a song.","Sarah is singing a song."],correct:1},
+{q:"The car was repaired by the mechanic.",task:"Change to Active Voice",options:["The mechanic repaired the car.","The mechanic repairs the car.","The mechanic repair the car."],correct:0},
+{q:"The cake is baked by mom.",task:"Change to Active Voice",options:["Mom baked the cake.","Mom bakes the cake.","Mom is baking the cake."],correct:1},
+{q:"The book was read by Peter.",task:"Change to Active Voice",options:["Peter reads the book.","Peter read the book.","Peter is reading the book."],correct:1}
+];
+let hp=5,gameTime=300,timerInterval=null,currentQ=null,isProcessing=false,gameEnded=false;
+const hpEl=document.getElementById('hp-val'),timerEl=document.getElementById('timer-val');
+const qTaskEl=document.getElementById('q-task'),qTextEl=document.getElementById('q-text');
+const optionsBox=document.getElementById('options-box'),playerChar=document.getElementById('player-char');
+const enemyChar=document.getElementById('enemy-char'),actionBanner=document.getElementById('action-banner');
+const cooldownMsg=document.getElementById('cooldown-msg'),overlayScreen=document.getElementById('overlay-screen');
+
+function updateTimerDisplay(){
+ const mins=Math.floor(gameTime/60).toString().padStart(2,'0');
+ const secs=(gameTime%60).toString().padStart(2,'0');
+ timerEl.textContent=`${mins}:${secs}`;
+}
+function startGame(){
+ hp=5;gameTime=300;isProcessing=false;gameEnded=false;
+ overlayScreen.style.display='none';updateHPDisplay();updateTimerDisplay();
+ clearInterval(timerInterval);
+ timerInterval=setInterval(()=>{
+  if(gameEnded)return;
+  gameTime--;updateTimerDisplay();
+  if(gameTime<=0)endGame(true);
+ },1000);
+ loadNextQuestion();
+}
+function updateHPDisplay(){
+ hpEl.textContent=hp>0?'❤️ '.repeat(hp):'0';
+}
+function loadNextQuestion(){
+ if(gameEnded)return;
+ cooldownMsg.textContent='';
+ actionBanner.textContent='เลือกคำตอบเพื่อโจมตี!';
+ actionBanner.style.color='#38bdf8';
+ playerChar.classList.remove('attack-anim','hurt-anim');
+ enemyChar.style.filter='';
+ currentQ=questions[Math.floor(Math.random()*questions.length)];
+ qTaskEl.textContent=currentQ.task;qTextEl.textContent=`"${currentQ.q}"`;
+ optionsBox.innerHTML='';
+ currentQ.options.forEach((opt,idx)=>{
+  const btn=document.createElement('button');
+  btn.className='btn-opt';btn.textContent=`${String.fromCharCode(65+idx)}. ${opt}`;
+  btn.onclick=()=>handleAnswer(idx);optionsBox.appendChild(btn);
+ });
+ isProcessing=false;
+}
+function handleAnswer(selectedIndex){
+ if(isProcessing||gameEnded)return;
+ isProcessing=true;
+ document.querySelectorAll('.btn-opt').forEach(b=>b.disabled=true);
+ const isCorrect=selectedIndex===currentQ.correct;
+ if(isCorrect){
+  hp++;updateHPDisplay();
+  actionBanner.textContent='⚡ ถูกต้อง! โจมตีสำเร็จ (+1 HP)';
+  actionBanner.style.color='#4ade80';
+  playerChar.classList.add('attack-anim');
+  enemyChar.style.filter='brightness(2) drop-shadow(0 0 12px #38bdf8)';
+ }else{
+  hp=Math.max(0,hp-1);updateHPDisplay();
+  actionBanner.textContent='❌ ยังไม่ถูกต้อง! เสีย 1 HP';
+  actionBanner.style.color='#f87171';
+  playerChar.classList.add('hurt-anim');
+ }
+ cooldownMsg.textContent=isCorrect?'โจมตีสำเร็จ! กำลังโหลดคำถามถัดไป...':'ลองใหม่ในข้อถัดไปนะ';
+ setTimeout(()=>{
+  if(hp<=0){endGame(false);return;}
+  loadNextQuestion();
+ },1100);
+}
+function endGame(won){
+ if(gameEnded)return;
+ gameEnded=true;clearInterval(timerInterval);isProcessing=true;
+ overlayScreen.style.display='flex';
+ document.getElementById('overlay-title').textContent=won?'🎉 จบเกม!':'💀 เกมโอเวอร์!';
+ document.getElementById('overlay-desc').textContent=won?'หมดเวลา 5 นาที! คุณเอาชีวิตรอดได้':'HP หมดแล้ว ลองเล่นอีกครั้งนะ';
+ document.getElementById('start-btn').textContent='เล่นอีกครั้ง';
+}
+</script>
+</body>
+</html>
